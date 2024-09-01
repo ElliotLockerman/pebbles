@@ -21,7 +21,7 @@ pub Lit: u32 = {
 
 pub Expr1: ast::Expr = {
     Lit => Num(<>),
-    "(" <Expr5> ")" => <>,
+    "(" <Expr9> ")" => <>,
 }
 
 pub Expr2: ast::Expr = {
