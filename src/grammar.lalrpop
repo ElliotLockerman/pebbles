@@ -1,0 +1,63 @@
+
+use crate::ast::{self, Expr::*};
+
+use std::str::FromStr;
+
+grammar;
+
+pub Lit: u32 = <r#"[0-9]+"#> => u32::from_str(<>).unwrap();
+
+pub Expr1: ast::Expr = {
+    Lit => Num(<>),
+    "(" <Expr5> ")" => <>,
+}
+
+pub Expr2: ast::Expr = {
+    "-" <Expr1> => Neg(Box::new(<>)),
+    "!" <Expr1> => Bitnot(Box::new(<>)),
+    Expr1,
+}
+
+// Expr3 reserved for 'as'
+
+pub Expr4: ast::Expr = {
+    <l:Expr4> "*" <r:Expr2> => Mul(Box::new(l), Box::new(r)),
+    <l:Expr4> "/" <r:Expr2> => Div(Box::new(l), Box::new(r)),
+    <l:Expr4> "%" <r:Expr2> => Rem(Box::new(l), Box::new(r)),
+    Expr2,
+}
+
+pub Expr5: ast::Expr = {
+    <l:Expr5> "+" <r:Expr4> => Add(Box::new(l), Box::new(r)),
+    <l:Expr5> "-" <r:Expr4> => Sub(Box::new(l), Box::new(r)),
+    Expr4,
+}
+
+pub Expr6: ast::Expr = {
+    <l:Expr6> "<<" <r:Expr5> => Shl(Box::new(l), Box::new(r)),
+    <l:Expr6> ">>" <r:Expr5> => Shr(Box::new(l), Box::new(r)),
+    Expr5,
+}
+
+pub Expr7: ast::Expr = {
+    <l:Expr7> "&" <r:Expr6> => And(Box::new(l), Box::new(r)),
+    Expr6,
+}
+
+pub Expr8: ast::Expr = {
+    <l:Expr8> "^" <r:Expr7> => Xor(Box::new(l), Box::new(r)),
+    Expr7,
+}
+
+pub Expr9: ast::Expr = {
+    <l:Expr9> "|" <r:Expr8> => Or(Box::new(l), Box::new(r)),
+    Expr8,
+}
+
+pub Expr: ast::Expr = {
+    Expr9,
+}
+
+
+
+
