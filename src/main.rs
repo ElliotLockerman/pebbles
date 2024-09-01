@@ -1,4 +1,6 @@
 
+#![feature(assert_matches)]
+
 mod ast;
 
 use lalrpop_util::lalrpop_mod;
@@ -40,6 +42,8 @@ mod tests {
     use crate::ast;
     use crate::grammar::ExprParser;
 
+    use std::assert_matches::assert_matches;
+
     use lalrpop_util::ParseError;
 
     #[test]
@@ -72,9 +76,25 @@ mod tests {
     fn malformed() {
         let parser = ExprParser::new();
 
-        assert_eq!(
+        assert_matches!(
             parser.parse("1000000000000").unwrap_err(),
-            ParseError::User{error: ast::Error::LitTooBig},
+            ParseError::User{error: ast::Error::LitParse(_)},
+        );
+        assert_matches!(
+            parser.parse("0xg").unwrap_err(),
+            ParseError::InvalidToken{..},
+        );
+        assert_matches!(
+            parser.parse("0x1000000000000").unwrap_err(),
+            ParseError::User{error: ast::Error::LitParse(_)},
+        );
+        assert_matches!(
+            parser.parse("0o9").unwrap_err(),
+            ParseError::InvalidToken{..},
+        );
+        assert_matches!(
+            parser.parse("0o1000000000000").unwrap_err(),
+            ParseError::User{error: ast::Error::LitParse(_)},
         );
         parser.parse("10 + 1)").unwrap_err();
         parser.parse("10 ++ 1)").unwrap_err();
@@ -98,6 +118,15 @@ mod tests {
         assert_eq!(parser.parse("!1").unwrap().eval(), !1);
         assert_eq!(parser.parse("!32").unwrap().eval(), !32);
         assert_eq!(parser.parse("!(-32)").unwrap().eval(), !(-32i32 as u32));
+    }
+
+    #[test]
+    fn radix_literal() {
+        let parser = ExprParser::new();
+
+        assert_eq!(parser.parse("0xf").unwrap().eval(), 15);
+        assert_eq!(parser.parse("0o20").unwrap().eval(), 16);
+        assert_eq!(parser.parse("0xf ^ 0o20").unwrap().eval(), 31);
     }
 }
 

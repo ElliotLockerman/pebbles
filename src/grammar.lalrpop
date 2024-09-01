@@ -12,10 +12,19 @@ extern {
 
 
 pub Lit: u32 = {
+    "0" => 0,
     <r#"[0-9]+"#> =>? u32::from_str(<>)
-        .map_err(|_| ParseError::User {
-            error: ast::Error::LitTooBig,
-        })
+        .map_err(|e| ParseError::User {
+            error: ast::Error::LitParse(e.to_string()),
+        }),
+    <r#"0o[0-7]+"#> =>? u32::from_str_radix(&<>[2..], 8)
+        .map_err(|e| ParseError::User {
+            error: ast::Error::LitParse(e.to_string()),
+        }),
+    <r#"0x[0-9a-fA-F]+"#> =>? u32::from_str_radix(&<>[2..], 16)
+        .map_err(|e| ParseError::User {
+            error: ast::Error::LitParse(e.to_string()),
+        }),
 }
 
 

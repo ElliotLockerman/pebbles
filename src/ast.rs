@@ -3,8 +3,8 @@ use thiserror::Error;
 
 #[derive(Debug, Error, PartialEq, Eq)]
 pub enum Error {
-    #[error("Literal too large")]
-    LitTooBig,
+    #[error("Error parsing literal: {}", .0)]
+    LitParse(String),
 }
 
 
