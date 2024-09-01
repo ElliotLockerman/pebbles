@@ -37,7 +37,9 @@ fn main() {
 
 #[cfg(test)]
 mod tests {
+    use crate::ast;
     use crate::grammar::ExprParser;
+    use lalrpop_util::ParseError;
 
     #[test]
     fn simple() {
@@ -47,6 +49,16 @@ mod tests {
         assert_eq!(parser.parse("1 + 1").unwrap().eval(), 2);
         assert_eq!(parser.parse("10 + 2 * 5").unwrap().eval(), 20);
         assert_eq!(parser.parse("(10 + 2) * 5").unwrap().eval(), 60);
+    }
+
+    #[test]
+    fn too_big() {
+        let parser = ExprParser::new();
+
+        assert_eq!(
+            parser.parse("1000000000000").unwrap_err(),
+            ParseError::User{error: ast::Error::LitTooBig},
+        );
     }
 }
 

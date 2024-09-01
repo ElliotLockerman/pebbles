@@ -1,11 +1,23 @@
 
 use crate::ast::{self, Expr::*};
 
+use lalrpop_util::ParseError;
 use std::str::FromStr;
 
 grammar;
 
-pub Lit: u32 = <r#"[0-9]+"#> => u32::from_str(<>).unwrap();
+extern {
+    type Error = ast::Error;
+}
+
+
+pub Lit: u32 = {
+    <r#"[0-9]+"#> =>? u32::from_str(<>)
+        .map_err(|_| ParseError::User {
+            error: ast::Error::LitTooBig,
+        })
+}
+
 
 pub Expr1: ast::Expr = {
     Lit => Num(<>),
