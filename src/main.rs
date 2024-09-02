@@ -25,70 +25,67 @@ enum Base {
     Oct,
 }
 
-impl Base {
-    fn print(self, mut val: u32) {
-        println!("{val}₁₀");
+fn print_int(mut val: u32, base: Base) {
+    println!("{val}₁₀");
 
-        // For oct and hex, split the binary in digit-sized chunks, and align them.
-        let (digit_bits, subscript) = match self {
-            Base::Oct => (3, &"₈"), 
-            Base::Hex => (4, &"₁₆"),
-        };
-        let digit_mask = (0x1 << digit_bits) - 1;
-        let mut digits = vec![];
-        while val > 0 {
-            digits.push(val & digit_mask);
-            val >>= digit_bits;
-        }
-
-        let num_chunks = div_round_up(u32::BITS, digit_bits);
-        while digits.len() < num_chunks as usize {
-            digits.push(0);
-        }
-
-        // Bits in the most significant chunk (since chunk size may not evenly divide word size).
-        let top_bits = if u32::BITS % digit_bits == 0 { 
-            digit_bits 
-        } else {
-            u32::BITS % digit_bits
-        };
-
-        // Print hex/oct, aligned with binary.
-        let mut seen_nonzero = false;
-        for (i, digit) in digits.iter().rev().enumerate() {
-            if i != 0 {
-                print!(" ");
-            }
-
-            let chunk_width = if i == 0 { top_bits } else { digit_bits } as usize;
-
-            // Don't print oct/hex leading zeros.
-            if *digit != 0 {
-                seen_nonzero = true;
-            }
-            if !seen_nonzero && i + 1 != digits.len() {
-                print!("{:chunk_width$}", "");
-            } else if self == Base::Oct {
-                print!("{digit:chunk_width$o}");
-            } else if self == Base::Hex {
-                print!("{digit:chunk_width$X}");
-            } else {
-                unreachable!();
-            }
-        }
-        println!("{subscript}");
-
-        // Print binary.
-        for (i, digit) in digits.iter().rev().enumerate() {
-            if i != 0 {
-                print!(" ");
-            }
-            let chunk_width = if i == 0 { top_bits } else { digit_bits } as usize;
-            print!("{digit:0chunk_width$b}");
-        }
-        println!("₂");
-
+    // For oct and hex, split the binary in digit-sized chunks, and align them.
+    let (digit_bits, subscript) = match base {
+        Base::Oct => (3, &"₈"), 
+        Base::Hex => (4, &"₁₆"),
+    };
+    let digit_mask = (0x1 << digit_bits) - 1;
+    let mut digits = vec![];
+    while val > 0 {
+        digits.push(val & digit_mask);
+        val >>= digit_bits;
     }
+
+    let num_chunks = div_round_up(u32::BITS, digit_bits);
+    while digits.len() < num_chunks as usize {
+        digits.push(0);
+    }
+
+    // Bits in the most significant chunk (since chunk size may not evenly divide word size).
+    let top_bits = if u32::BITS % digit_bits == 0 { 
+        digit_bits 
+    } else {
+        u32::BITS % digit_bits
+    };
+
+    // Print hex/oct, aligned with binary.
+    let mut seen_nonzero = false;
+    for (i, digit) in digits.iter().rev().enumerate() {
+        if i != 0 {
+            print!(" ");
+        }
+
+        let chunk_width = if i == 0 { top_bits } else { digit_bits } as usize;
+
+        // Don't print oct/hex leading zeros.
+        if *digit != 0 {
+            seen_nonzero = true;
+        }
+        if !seen_nonzero && i + 1 != digits.len() {
+            print!("{:chunk_width$}", "");
+        } else {
+            match base {
+                Base::Oct => print!("{digit:chunk_width$o}"),
+                Base::Hex => print!("{digit:chunk_width$X}"),
+            }
+        }
+    }
+    println!("{subscript}");
+
+    // Print binary.
+    for (i, digit) in digits.iter().rev().enumerate() {
+        if i != 0 {
+            print!(" ");
+        }
+        let chunk_width = if i == 0 { top_bits } else { digit_bits } as usize;
+        print!("{digit:0chunk_width$b}");
+    }
+    println!("₂");
+
 }
 
 #[derive(Parser, Debug)]
@@ -116,7 +113,7 @@ fn main() -> ExitCode {
     if let Some(expr) = &args.expr {
         return match eval(expr) {
             Ok(val) => {
-                args.base.print(val);
+                print_int(val, args.base);
                 ExitCode::SUCCESS
             },
             Err(msg) => {
@@ -137,7 +134,7 @@ fn main() -> ExitCode {
                     continue; 
                 }
                 match eval(&line) {
-                    Ok(val) => args.base.print(val),
+                    Ok(val) => print_int(val, args.base),
                     Err(msg) => eprintln!("{msg}"),
                 }
 
