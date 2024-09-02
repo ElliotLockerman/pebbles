@@ -1,5 +1,5 @@
 
-use crate::ast::{self, Expr::*};
+use crate::expr::{self, Expr::*};
 
 use lalrpop_util::ParseError;
 use std::str::FromStr;
@@ -7,7 +7,7 @@ use std::str::FromStr;
 grammar;
 
 extern {
-    type Error = ast::Error;
+    type Error = expr::Error;
 }
 
 
@@ -15,25 +15,25 @@ pub Lit: u32 = {
     "0" => 0,
     <r#"[0-9]+"#> =>? u32::from_str(<>)
         .map_err(|e| ParseError::User {
-            error: ast::Error::LitParse(e.to_string()),
+            error: expr::Error::LitParse(e.to_string()),
         }),
     <r#"0o[0-7]+"#> =>? u32::from_str_radix(&<>[2..], 8)
         .map_err(|e| ParseError::User {
-            error: ast::Error::LitParse(e.to_string()),
+            error: expr::Error::LitParse(e.to_string()),
         }),
     <r#"0x[0-9a-fA-F]+"#> =>? u32::from_str_radix(&<>[2..], 16)
         .map_err(|e| ParseError::User {
-            error: ast::Error::LitParse(e.to_string()),
+            error: expr::Error::LitParse(e.to_string()),
         }),
 }
 
 
-pub Expr1: ast::Expr = {
+pub Expr1: expr::Expr = {
     Lit => Num(<>),
     "(" <Expr9> ")" => <>,
 }
 
-pub Expr2: ast::Expr = {
+pub Expr2: expr::Expr = {
     "-" <Expr1> => Neg(Box::new(<>)),
     "!" <Expr1> => Bitnot(Box::new(<>)),
     Expr1,
@@ -41,41 +41,41 @@ pub Expr2: ast::Expr = {
 
 // Expr3 reserved for 'as'
 
-pub Expr4: ast::Expr = {
+pub Expr4: expr::Expr = {
     <l:Expr4> "*" <r:Expr2> => Mul(Box::new(l), Box::new(r)),
     <l:Expr4> "/" <r:Expr2> => Div(Box::new(l), Box::new(r)),
     <l:Expr4> "%" <r:Expr2> => Rem(Box::new(l), Box::new(r)),
     Expr2,
 }
 
-pub Expr5: ast::Expr = {
+pub Expr5: expr::Expr = {
     <l:Expr5> "+" <r:Expr4> => Add(Box::new(l), Box::new(r)),
     <l:Expr5> "-" <r:Expr4> => Sub(Box::new(l), Box::new(r)),
     Expr4,
 }
 
-pub Expr6: ast::Expr = {
+pub Expr6: expr::Expr = {
     <l:Expr6> "<<" <r:Expr5> => Shl(Box::new(l), Box::new(r)),
     <l:Expr6> ">>" <r:Expr5> => Shr(Box::new(l), Box::new(r)),
     Expr5,
 }
 
-pub Expr7: ast::Expr = {
+pub Expr7: expr::Expr = {
     <l:Expr7> "&" <r:Expr6> => And(Box::new(l), Box::new(r)),
     Expr6,
 }
 
-pub Expr8: ast::Expr = {
+pub Expr8: expr::Expr = {
     <l:Expr8> "^" <r:Expr7> => Xor(Box::new(l), Box::new(r)),
     Expr7,
 }
 
-pub Expr9: ast::Expr = {
+pub Expr9: expr::Expr = {
     <l:Expr9> "|" <r:Expr8> => Or(Box::new(l), Box::new(r)),
     Expr8,
 }
 
-pub Expr: ast::Expr = {
+pub Expr: expr::Expr = {
     Expr9,
 }
 

@@ -1,7 +1,7 @@
 
 #![feature(assert_matches)]
 
-mod ast;
+mod expr;
 
 use std::process::ExitCode;
 use std::thread_local;

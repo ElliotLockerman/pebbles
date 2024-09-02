@@ -75,7 +75,7 @@ impl Expr {
 
 #[cfg(test)]
 mod tests {
-    use crate::ast;
+    use super::*;
     use crate::grammar::ExprParser;
 
     use std::assert_matches::assert_matches;
@@ -114,7 +114,7 @@ mod tests {
 
         assert_matches!(
             parser.parse("1000000000000").unwrap_err(),
-            ParseError::User{error: ast::Error::LitParse(_)},
+            ParseError::User{error: Error::LitParse(_)},
         );
         assert_matches!(
             parser.parse("0xg").unwrap_err(),
@@ -122,7 +122,7 @@ mod tests {
         );
         assert_matches!(
             parser.parse("0x1000000000000").unwrap_err(),
-            ParseError::User{error: ast::Error::LitParse(_)},
+            ParseError::User{error: Error::LitParse(_)},
         );
         assert_matches!(
             parser.parse("0o9").unwrap_err(),
@@ -130,7 +130,7 @@ mod tests {
         );
         assert_matches!(
             parser.parse("0o1000000000000").unwrap_err(),
-            ParseError::User{error: ast::Error::LitParse(_)},
+            ParseError::User{error: Error::LitParse(_)},
         );
         parser.parse("10 + 1)").unwrap_err();
         parser.parse("10 ++ 1)").unwrap_err();
