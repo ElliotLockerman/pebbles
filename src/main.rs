@@ -21,47 +21,18 @@ fn div_round_up(dividend: u32, divisor: u32) -> u32 {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum, Display)]
 #[strum(serialize_all = "kebab-case")]
 enum Base {
-    Dec,
+    Hex,
     Oct,
-    Hex
 }
 
 impl Base {
     fn print(self, mut val: u32) {
-        if self == Base::Dec {
-            // Base 10 doesn't nicely split it to chunks of bits, so split in to nibbles
-            println!("{val}₁₀");
-            let nibble_bits = u8::BITS / 2;
-            let nibble_mask = (0x1 << nibble_bits) - 1;
-            let mut nibbles = vec![];
-
-            while val > 0 {
-                nibbles.push(val & nibble_mask);
-                val >>= nibble_bits;
-            }
-
-            let num_nibbles = div_round_up(u32::BITS, nibble_bits);
-            while nibbles.len() < num_nibbles as usize {
-                nibbles.push(0);
-            }
-
-            for (i, nibble) in nibbles.iter().rev().enumerate() {
-                if i > 0 {
-                    print!(" ");
-                }
-                print!("{nibble:04b}");
-            }
-            println!();
-            return;
-        }
-
         println!("{val}₁₀");
 
         // For oct and hex, split the binary in digit-sized chunks, and align them.
         let (digit_bits, subscript) = match self {
             Base::Oct => (3, &"₈"), 
             Base::Hex => (4, &"₁₆"),
-            _ => unreachable!()
         };
         let digit_mask = (0x1 << digit_bits) - 1;
         let mut digits = vec![];
@@ -122,9 +93,9 @@ impl Base {
 
 #[derive(Parser, Debug)]
 struct Args {
-    #[arg(default_value_t=Base::Dec)]
-    base: Base,
     expr: Option<String>,
+    #[arg(long, default_value_t=Base::Hex)]
+    base: Base,
 }
 
 fn eval(expr: &str) -> Result<u32, String> {
