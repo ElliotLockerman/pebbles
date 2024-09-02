@@ -13,6 +13,11 @@ use rustyline::{DefaultEditor, error::ReadlineError};
 use clap::{Parser, ValueEnum};
 use strum::Display;
 
+#[inline]
+fn div_round_up(dividend: u32, divisor: u32) -> u32 {
+    (dividend + divisor - 1) / divisor
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum, Display)]
 #[strum(serialize_all = "kebab-case")]
 enum Base {
@@ -22,95 +27,97 @@ enum Base {
 }
 
 impl Base {
-    fn print(self, val: u32) {
-        match self {
-            Base::Dec => Self::print_dec(val),
-            Base::Oct => Self::print_oct(val),
-            Base::Hex => Self::print_hex(val),
+    fn print(self, mut val: u32) {
+        if self == Base::Dec {
+            // Base 10 doesn't nicely split it to chunks of bits, so split in to nibbles
+            println!("{val}₁₀");
+            let nibble_bits = u8::BITS / 2;
+            let nibble_mask = (0x1 << nibble_bits) - 1;
+            let mut nibbles = vec![];
+
+            while val > 0 {
+                nibbles.push(val & nibble_mask);
+                val >>= nibble_bits;
+            }
+
+            let num_nibbles = div_round_up(u32::BITS, nibble_bits);
+            while nibbles.len() < num_nibbles as usize {
+                nibbles.push(0);
+            }
+
+            for (i, nibble) in nibbles.iter().rev().enumerate() {
+                if i > 0 {
+                    print!(" ");
+                }
+                print!("{nibble:04b}");
+            }
+            println!();
+            return;
         }
-    }
 
-    fn print_dec(val: u32) {
-        println!("{val:32}");
-        println!("{val:032b}");
-    }
+        println!("{val}₁₀");
 
-    fn print_oct(mut val: u32) {
-        const OCT_BITS: u32 = 3; // Bits in an octal digits.
-        const OCT_MASK: u32 = (1 << OCT_BITS) - 1;
+        // For oct and hex, split the binary in digit-sized chunks, and align them.
+        let (digit_bits, subscript) = match self {
+            Base::Oct => (3, &"₈"), 
+            Base::Hex => (4, &"₁₆"),
+            _ => unreachable!()
+        };
+        let digit_mask = (0x1 << digit_bits) - 1;
         let mut digits = vec![];
         while val > 0 {
-            digits.push(val & OCT_MASK);
-            val >>= OCT_BITS;
+            digits.push(val & digit_mask);
+            val >>= digit_bits;
         }
 
-        while digits.len() < (u32::BITS / OCT_BITS) as usize {
+        let num_chunks = div_round_up(u32::BITS, digit_bits);
+        while digits.len() < num_chunks as usize {
             digits.push(0);
         }
 
+        // Bits in the most significant chunk (since chunk size may not evenly divide word size).
+        let top_bits = if u32::BITS % digit_bits == 0 { 
+            digit_bits 
+        } else {
+            u32::BITS % digit_bits
+        };
+
+        // Print hex/oct, aligned with binary.
+        let mut seen_nonzero = false;
         for (i, digit) in digits.iter().rev().enumerate() {
             if i != 0 {
                 print!(" ");
             }
 
-            let width = if i == 0 { 2 } else { OCT_BITS as usize };
+            let chunk_width = if i == 0 { top_bits } else { digit_bits } as usize;
 
-            // Don't print oct leading zeros.
-            if *digit == 0 && i + 1 != digits.len() {
-                print!("{:width$}", "");
+            // Don't print oct/hex leading zeros.
+            if *digit != 0 {
+                seen_nonzero = true;
+            }
+            if !seen_nonzero && i + 1 != digits.len() {
+                print!("{:chunk_width$}", "");
+            } else if self == Base::Oct {
+                print!("{digit:chunk_width$o}");
+            } else if self == Base::Hex {
+                print!("{digit:chunk_width$X}");
             } else {
-                print!("{digit:width$o}");
+                unreachable!();
             }
         }
-        println!();
+        println!("{subscript}");
 
+        // Print binary.
         for (i, digit) in digits.iter().rev().enumerate() {
             if i != 0 {
                 print!(" ");
             }
-            let width = if i == 0 { 2 } else { OCT_BITS as usize };
-            print!("{digit:0width$b}");
+            let chunk_width = if i == 0 { top_bits } else { digit_bits } as usize;
+            print!("{digit:0chunk_width$b}");
         }
-        println!();
+        println!("₂");
+
     }
-
-    fn print_hex(mut val: u32) {
-        const HEX_BITS: u32 = 4; // Bits in an octal digits.
-        const HEX_MASK: u32 = (1 << HEX_BITS) - 1;
-        let mut digits = vec![];
-        while val > 0 {
-            digits.push(val & HEX_MASK);
-            val >>= HEX_BITS;
-        }
-
-        while digits.len() < (u32::BITS / HEX_BITS) as usize {
-            digits.push(0);
-        }
-
-        let cluster_width = HEX_BITS as usize;
-        for (i, digit) in digits.iter().rev().enumerate() {
-            if i != 0 {
-                print!(" ");
-            }
-
-            // Don't print hex leading zeros.
-            if *digit == 0 && i + 1 != digits.len() {
-                print!("{:cluster_width$}", "");
-            } else {
-                print!("{digit:cluster_width$X}");
-            }
-        }
-        println!();
-
-        for (i, digit) in digits.iter().rev().enumerate() {
-            if i != 0 {
-                print!(" ");
-            }
-            print!("{digit:0cluster_width$b}");
-        }
-        println!();
-    }
-
 }
 
 #[derive(Parser, Debug)]
