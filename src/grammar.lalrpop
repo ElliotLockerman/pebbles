@@ -27,56 +27,40 @@ pub Lit: u32 = {
         }),
 }
 
-
-pub Expr1: expr::Expr = {
-    Lit => Num(<>),
-    "(" <Expr9> ")" => <>,
-}
-
-pub Expr2: expr::Expr = {
-    "-" <Expr1> => Neg(Box::new(<>)),
-    "!" <Expr1> => Bitnot(Box::new(<>)),
-    Expr1,
-}
-
-// Expr3 reserved for 'as'
-
-pub Expr4: expr::Expr = {
-    <l:Expr4> "*" <r:Expr2> => Mul(Box::new(l), Box::new(r)),
-    <l:Expr4> "/" <r:Expr2> => Div(Box::new(l), Box::new(r)),
-    <l:Expr4> "%" <r:Expr2> => Rem(Box::new(l), Box::new(r)),
-    Expr2,
-}
-
-pub Expr5: expr::Expr = {
-    <l:Expr5> "+" <r:Expr4> => Add(Box::new(l), Box::new(r)),
-    <l:Expr5> "-" <r:Expr4> => Sub(Box::new(l), Box::new(r)),
-    Expr4,
-}
-
-pub Expr6: expr::Expr = {
-    <l:Expr6> "<<" <r:Expr5> => Shl(Box::new(l), Box::new(r)),
-    <l:Expr6> ">>" <r:Expr5> => Shr(Box::new(l), Box::new(r)),
-    Expr5,
-}
-
-pub Expr7: expr::Expr = {
-    <l:Expr7> "&" <r:Expr6> => And(Box::new(l), Box::new(r)),
-    Expr6,
-}
-
-pub Expr8: expr::Expr = {
-    <l:Expr8> "^" <r:Expr7> => Xor(Box::new(l), Box::new(r)),
-    Expr7,
-}
-
-pub Expr9: expr::Expr = {
-    <l:Expr9> "|" <r:Expr8> => Or(Box::new(l), Box::new(r)),
-    Expr8,
-}
+pub ExprReset = Expr;
 
 pub Expr: expr::Expr = {
-    Expr9,
+    #[precedence(level="0")]
+    Lit => Num(<>),
+    "(" <ExprReset> ")" => <>,
+
+    #[precedence(level="1")] #[assoc(side="left")]
+    "-" <Expr> => Neg(Box::new(<>)),
+    "!" <Expr> => Bitnot(Box::new(<>)),
+
+    // Precedence 2 reserved for 'as'
+
+    #[precedence(level="3")] #[assoc(side="left")]
+    <l:Expr> "*" <r:Expr> => Mul(Box::new(l), Box::new(r)),
+    <l:Expr> "/" <r:Expr> => Div(Box::new(l), Box::new(r)),
+    <l:Expr> "%" <r:Expr> => Rem(Box::new(l), Box::new(r)),
+
+    #[precedence(level="4")] #[assoc(side="left")]
+    <l:Expr> "+" <r:Expr> => Add(Box::new(l), Box::new(r)),
+    <l:Expr> "-" <r:Expr> => Sub(Box::new(l), Box::new(r)),
+
+    #[precedence(level="5")] #[assoc(side="left")]
+    <l:Expr> "<<" <r:Expr> => Shl(Box::new(l), Box::new(r)),
+    <l:Expr> ">>" <r:Expr> => Shr(Box::new(l), Box::new(r)),
+
+    #[precedence(level="6")] #[assoc(side="left")]
+    <l:Expr> "&" <r:Expr> => And(Box::new(l), Box::new(r)),
+
+    #[precedence(level="7")] #[assoc(side="left")]
+    <l:Expr> "^" <r:Expr> => Xor(Box::new(l), Box::new(r)),
+
+    #[precedence(level="8")] #[assoc(side="left")]
+    <l:Expr> "|" <r:Expr> => Or(Box::new(l), Box::new(r)),
 }
 
 
