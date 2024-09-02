@@ -5,51 +5,55 @@ mod expr;
 
 use std::process::ExitCode;
 use std::thread_local;
+use std::{fmt, ops};
 
 use lalrpop_util::lalrpop_mod;
 lalrpop_mod!(grammar, "/grammar.rs");
 
 use rustyline::{DefaultEditor, error::ReadlineError};
 use clap::{Parser, ValueEnum};
-use strum::Display;
+use num_traits::int::PrimInt;
 
 #[inline]
-fn div_round_up(dividend: u32, divisor: u32) -> u32 {
-    (dividend + divisor - 1) / divisor
+fn div_round_up<T: PrimInt>(dividend: T, divisor: T) -> T {
+    (dividend + divisor - T::one()) / divisor
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum, Display)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum, strum::Display)]
 #[strum(serialize_all = "kebab-case")]
 enum Base {
     Hex,
     Oct,
 }
 
-fn print_int(mut val: u32, base: Base) {
+fn print_int<T>(mut val: T, base: Base) 
+    where T: PrimInt + fmt::Display + fmt::Octal + fmt::UpperHex + fmt::Binary + ops::ShrAssign {
     println!("{val}₁₀");
 
     // For oct and hex, split the binary in digit-sized chunks, and align them.
     let (digit_bits, subscript) = match base {
-        Base::Oct => (3, &"₈"), 
-        Base::Hex => (4, &"₁₆"),
+        Base::Oct => (T::from(3).unwrap(), &"₈"), 
+        Base::Hex => (T::from(4).unwrap(), &"₁₆"),
     };
-    let digit_mask = (0x1 << digit_bits) - 1;
+    let digit_mask = (T::one() << digit_bits.to_usize().unwrap()) - T::one();
     let mut digits = vec![];
-    while val > 0 {
+    while val > T::zero() {
         digits.push(val & digit_mask);
         val >>= digit_bits;
     }
 
-    let num_chunks = div_round_up(u32::BITS, digit_bits);
-    while digits.len() < num_chunks as usize {
-        digits.push(0);
+    // Add extra zero chunks until we reach the full width.
+    let t_bits = T::from(T::zero().count_zeros()).unwrap();
+    let num_chunks = div_round_up(t_bits, digit_bits);
+    while digits.len() < num_chunks.to_usize().unwrap() {
+        digits.push(T::zero());
     }
 
     // Bits in the most significant chunk (since chunk size may not evenly divide word size).
-    let top_bits = if u32::BITS % digit_bits == 0 { 
+    let top_bits = if t_bits % digit_bits == T::zero() { 
         digit_bits 
     } else {
-        u32::BITS % digit_bits
+        t_bits % digit_bits
     };
 
     // Print hex/oct, aligned with binary.
@@ -59,10 +63,10 @@ fn print_int(mut val: u32, base: Base) {
             print!(" ");
         }
 
-        let chunk_width = if i == 0 { top_bits } else { digit_bits } as usize;
+        let chunk_width = if i == 0 { top_bits } else { digit_bits }.to_usize().unwrap();
 
         // Don't print oct/hex leading zeros.
-        if *digit != 0 {
+        if *digit != T::zero() {
             seen_nonzero = true;
         }
         if !seen_nonzero && i + 1 != digits.len() {
@@ -76,12 +80,12 @@ fn print_int(mut val: u32, base: Base) {
     }
     println!("{subscript}");
 
-    // Print binary.
+    // Print binary (including leading zeros).
     for (i, digit) in digits.iter().rev().enumerate() {
         if i != 0 {
             print!(" ");
         }
-        let chunk_width = if i == 0 { top_bits } else { digit_bits } as usize;
+        let chunk_width = if i == 0 { top_bits } else { digit_bits }.to_usize().unwrap();
         print!("{digit:0chunk_width$b}");
     }
     println!("₂");
