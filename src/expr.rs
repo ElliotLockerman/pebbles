@@ -1,5 +1,9 @@
 
 use thiserror::Error;
+use num_traits::ops::wrapping::*;
+use num_traits::int::PrimInt;
+
+use crate::traits::{WrappingDiv, WrappingRem};
 
 #[derive(Debug, Error, PartialEq, Eq)]
 pub enum Error {
@@ -7,67 +11,73 @@ pub enum Error {
     LitParse(String),
 }
 
+pub trait Int = PrimInt + WrappingAdd + WrappingSub + WrappingMul + WrappingNeg + WrappingShl + WrappingShr + WrappingDiv + WrappingRem;
+
 
 #[derive(Debug, Clone)]
-pub enum Expr {
+pub enum Expr<T=u32>
+    where T: Int {
     // Precedence 1 (or parenthensized).
-    Num(u32),
+    Num(T),
 
     // Precedence 2.
-    Neg(Box<Expr>),
-    Bitnot(Box<Expr>),
+    Neg(Box<Expr<T>>),
+    Bitnot(Box<Expr<T>>),
 
     // Precedence 3 reserved for "as".
 
     // Precedence 4.
-    Mul(Box<Expr>, Box<Expr>),
-    Div(Box<Expr>, Box<Expr>),
-    Rem(Box<Expr>, Box<Expr>),
+    Mul(Box<Expr<T>>, Box<Expr<T>>),
+    Div(Box<Expr<T>>, Box<Expr<T>>),
+    Rem(Box<Expr<T>>, Box<Expr<T>>),
 
 
     // Precedence 4.
-    Add(Box<Expr>, Box<Expr>),
-    Sub(Box<Expr>, Box<Expr>),
+    Add(Box<Expr<T>>, Box<Expr<T>>),
+    Sub(Box<Expr<T>>, Box<Expr<T>>),
 
     // Precedence 6.
-    Shr(Box<Expr>, Box<Expr>),
-    Shl(Box<Expr>, Box<Expr>),
+    Shr(Box<Expr<T>>, Box<Expr<T>>),
+    Shl(Box<Expr<T>>, Box<Expr<T>>),
 
     // Precedence 7.
-    And(Box<Expr>, Box<Expr>),
+    And(Box<Expr<T>>, Box<Expr<T>>),
 
     // Precedence 8.
-    Xor(Box<Expr>, Box<Expr>),
+    Xor(Box<Expr<T>>, Box<Expr<T>>),
 
     // Precedence 9.
-    Or(Box<Expr>, Box<Expr>),
+    Or(Box<Expr<T>>, Box<Expr<T>>),
 }
 
 
-impl Expr {
-    pub fn eval(&self) -> u32 {
+impl<T> Expr<T> 
+    where T: Int {
+
+    pub fn eval(&self) -> T {
+        let t_bits = T::from(T::zero().count_zeros()).unwrap();
         use Expr::*;
         match self {
             Num(n) => *n,
 
             Neg(e) => e.eval().wrapping_neg(),
-            Bitnot(e) => !e.eval(),
+            Bitnot(e) => e.eval().not(),
 
-            Mul(l, r) => l.eval().wrapping_mul(r.eval()),
-            Div(l, r) => l.eval().wrapping_div(r.eval()),
-            Rem(l, r) => l.eval().wrapping_rem(r.eval()),
+            Mul(l, r) => l.eval().wrapping_mul(&r.eval()),
+            Div(l, r) => l.eval().wrapping_div(&r.eval()),
+            Rem(l, r) => l.eval().wrapping_rem(&r.eval()),
 
-            Add(l, r) => l.eval().wrapping_add(r.eval()),
-            Sub(l, r) => l.eval().wrapping_sub(r.eval()),
+            Add(l, r) => l.eval().wrapping_add(&r.eval()),
+            Sub(l, r) => l.eval().wrapping_sub(&r.eval()),
 
-            Shr(l, r) => l.eval().wrapping_shr(r.eval()),
-            Shl(l, r) => l.eval().wrapping_shl(r.eval()),
+            Shr(l, r) => l.eval().wrapping_shr((r.eval() & (t_bits - T::one())).to_u32().unwrap()),
+            Shl(l, r) => l.eval().wrapping_shl((r.eval() & (t_bits - T::one())).to_u32().unwrap()),
 
-            And(l, r) => l.eval() & r.eval(),
+            And(l, r) => l.eval().bitand(r.eval()),
 
-            Xor(l, r) => l.eval() ^ r.eval(),
+            Xor(l, r) => l.eval().bitxor(r.eval()),
 
-            Or(l, r) => l.eval() | r.eval(),
+            Or(l, r) => l.eval().bitor(r.eval()),
         }
     }
 }
