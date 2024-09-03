@@ -94,22 +94,65 @@ fn print_int<T>(mut val: T, base: Base)
 
 }
 
+
+#[derive(Debug, Clone, Copy, strum::Display, ValueEnum)]
+#[strum(serialize_all = "kebab_case")]
+enum IntType {
+    U8,
+    U16,
+    U32,
+    U64,
+    U128,
+}
+
 #[derive(Parser, Debug)]
 struct Args {
     expr: Option<String>,
+
     #[arg(long, default_value_t=Base::Hex)]
     base: Base,
+
+    #[arg(long = "type", default_value_t=IntType::U32)]
+    typ: IntType,
 }
 
-fn eval(expr: &str) -> Result<u32, String> {
+macro_rules! eval {
+    ($expr:ident, $base:ident, $typ:ty) => {{
+        let val = match $expr.eval::<$typ>() {
+            Ok(val) => val,
+            Err(e) => { 
+                eprintln!("{e}");
+                return Err(());
+            },
+        };
+
+        print_int(val, $base);
+    }}
+}
+
+fn exec(expr: &str, base: Base, typ: IntType) -> Result<(), ()> {
     thread_local! {
         static PARSER: grammar::ExprParser = Default::default();
     }
 
-    match PARSER.with(|p| p.parse(expr)) {
-        Ok(expr) => Ok(expr.eval()),
-        Err(e) => Err(e.to_string()),
+    let expr = match PARSER.with(|p| p.parse(expr)) {
+        Ok(expr) => expr,
+        Err(e) => { 
+            eprintln!("{e}");
+            return Err(());
+        },
+    };
+
+    use IntType::*;
+    match typ {
+        U8 => eval!(expr, base, u8),
+        U16 => eval!(expr, base, u16),
+        U32 => eval!(expr, base, u32),
+        U64 => eval!(expr, base, u64),
+        U128 => eval!(expr, base, u128),
     }
+
+    Ok(())
 }
 
 fn main() -> ExitCode {
@@ -117,15 +160,9 @@ fn main() -> ExitCode {
     let args = Args::parse();
 
     if let Some(expr) = &args.expr {
-        return match eval(expr) {
-            Ok(val) => {
-                print_int(val, args.base);
-                ExitCode::SUCCESS
-            },
-            Err(msg) => {
-                eprintln!("{msg}");
-                ExitCode::FAILURE
-            },
+        return match exec(expr, args.base, args.typ) {
+            Ok(()) => ExitCode::SUCCESS,
+            Err(()) => ExitCode::FAILURE,
         }
     }
 
@@ -139,11 +176,7 @@ fn main() -> ExitCode {
                 if line.chars().all(|ch| ch.is_whitespace()) {
                     continue; 
                 }
-                match eval(&line) {
-                    Ok(val) => print_int(val, args.base),
-                    Err(msg) => eprintln!("{msg}"),
-                }
-
+                let _ = exec(&line, args.base, args.typ);
             },
             Err(ReadlineError::Interrupted)| Err(ReadlineError::Eof) => break,
             Err(err) => println!("Error: {:?}", err),

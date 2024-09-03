@@ -2,6 +2,7 @@
 use thiserror::Error;
 use num_traits::ops::wrapping::*;
 use num_traits::int::PrimInt;
+use num_traits::cast::FromPrimitive;
 
 use crate::traits::{WrappingDiv, WrappingRem};
 
@@ -11,75 +12,78 @@ pub enum Error {
     LitParse(String),
 }
 
-pub trait Int = PrimInt + WrappingAdd + WrappingSub + WrappingMul + WrappingNeg + WrappingShl + WrappingShr + WrappingDiv + WrappingRem;
+pub trait Int = PrimInt + WrappingAdd + WrappingSub + WrappingMul + WrappingNeg + WrappingShl + WrappingShr + WrappingDiv + WrappingRem + FromPrimitive;
+
+
+#[derive(Debug, Clone, Copy, Error)]
+pub enum EvalErr{
+    #[error("Literal '{}' too large", .0)]
+    TooLarge(u128),
+}
 
 
 #[derive(Debug, Clone)]
-pub enum Expr<T=u32>
-    where T: Int {
+pub enum Expr {
     // Precedence 1 (or parenthensized).
-    Num(T),
+    Num(u128),
 
     // Precedence 2.
-    Neg(Box<Expr<T>>),
-    Bitnot(Box<Expr<T>>),
+    Neg(Box<Expr>),
+    Bitnot(Box<Expr>),
 
     // Precedence 3 reserved for "as".
 
     // Precedence 4.
-    Mul(Box<Expr<T>>, Box<Expr<T>>),
-    Div(Box<Expr<T>>, Box<Expr<T>>),
-    Rem(Box<Expr<T>>, Box<Expr<T>>),
+    Mul(Box<Expr>, Box<Expr>),
+    Div(Box<Expr>, Box<Expr>),
+    Rem(Box<Expr>, Box<Expr>),
 
 
     // Precedence 4.
-    Add(Box<Expr<T>>, Box<Expr<T>>),
-    Sub(Box<Expr<T>>, Box<Expr<T>>),
+    Add(Box<Expr>, Box<Expr>),
+    Sub(Box<Expr>, Box<Expr>),
 
     // Precedence 6.
-    Shr(Box<Expr<T>>, Box<Expr<T>>),
-    Shl(Box<Expr<T>>, Box<Expr<T>>),
+    Shr(Box<Expr>, Box<Expr>),
+    Shl(Box<Expr>, Box<Expr>),
 
     // Precedence 7.
-    And(Box<Expr<T>>, Box<Expr<T>>),
+    And(Box<Expr>, Box<Expr>),
 
     // Precedence 8.
-    Xor(Box<Expr<T>>, Box<Expr<T>>),
+    Xor(Box<Expr>, Box<Expr>),
 
     // Precedence 9.
-    Or(Box<Expr<T>>, Box<Expr<T>>),
+    Or(Box<Expr>, Box<Expr>),
 }
-
-
-impl<T> Expr<T> 
-    where T: Int {
-
-    pub fn eval(&self) -> T {
+impl Expr {
+    pub fn eval<T: Int>(&self) -> Result<T, EvalErr> {
         let t_bits = T::from(T::zero().count_zeros()).unwrap();
         use Expr::*;
-        match self {
-            Num(n) => *n,
+        Ok(match self {
+            Num(n) => T::from_u128(*n).ok_or(EvalErr::TooLarge(*n))?,
 
-            Neg(e) => e.eval().wrapping_neg(),
-            Bitnot(e) => e.eval().not(),
+            Neg(e) => e.eval::<T>()?.wrapping_neg(),
+            Bitnot(e) => e.eval::<T>()?.not(),
 
-            Mul(l, r) => l.eval().wrapping_mul(&r.eval()),
-            Div(l, r) => l.eval().wrapping_div(&r.eval()),
-            Rem(l, r) => l.eval().wrapping_rem(&r.eval()),
+            Mul(l, r) => l.eval::<T>()?.wrapping_mul(&r.eval::<T>()?),
+            Div(l, r) => l.eval::<T>()?.wrapping_div(&r.eval::<T>()?),
+            Rem(l, r) => l.eval::<T>()?.wrapping_rem(&r.eval::<T>()?),
 
-            Add(l, r) => l.eval().wrapping_add(&r.eval()),
-            Sub(l, r) => l.eval().wrapping_sub(&r.eval()),
+            Add(l, r) => l.eval::<T>()?.wrapping_add(&r.eval::<T>()?),
+            Sub(l, r) => l.eval::<T>()?.wrapping_sub(&r.eval::<T>()?),
 
-            Shr(l, r) => l.eval().wrapping_shr((r.eval() & (t_bits - T::one())).to_u32().unwrap()),
-            Shl(l, r) => l.eval().wrapping_shl((r.eval() & (t_bits - T::one())).to_u32().unwrap()),
+            Shr(l, r) => l.eval::<T>()?.wrapping_shr((r.eval::<T>()? & (t_bits - T::one())).to_u32().unwrap()),
+            Shl(l, r) => l.eval::<T>()?.wrapping_shl((r.eval::<T>()? & (t_bits - T::one())).to_u32().unwrap()),
 
-            And(l, r) => l.eval().bitand(r.eval()),
+            And(l, r) => l.eval::<T>()?.bitand(r.eval::<T>()?),
 
-            Xor(l, r) => l.eval().bitxor(r.eval()),
+            Xor(l, r) => l.eval::<T>()?.bitxor(r.eval::<T>()?),
 
-            Or(l, r) => l.eval().bitor(r.eval()),
-        }
+            Or(l, r) => l.eval::<T>()?.bitor(r.eval::<T>()?),
+        })
     }
+
 }
 
 
