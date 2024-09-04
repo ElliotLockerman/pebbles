@@ -114,31 +114,47 @@ mod tests {
         )
     }
 
+    macro_rules! simple_tests {
+        ($typ:ty) => {
+            assert_eq!(eval::<$typ>("1"), 1);
+            assert_eq!(eval::<$typ>("(1)"), 1);
+            assert_eq!(eval::<$typ>("(1 + 1)"), 2);
+            assert_eq!(eval::<$typ>("(1) + 1"), 2);
+            assert_eq!(eval::<$typ>("1 + (1)"), 2);
+            assert_eq!(eval::<$typ>("10 + 2 * 5"), 20);
+            assert_eq!(eval::<$typ>("(10 + 2) * 5"), 60);
+
+            assert_eq!(eval::<$typ>("10/3"), 3);
+            assert_eq!(eval::<$typ>("10 % 3"), 1);
+
+            assert_eq!(eval::<$typ>("2 & 1"), 0);
+            assert_eq!(eval::<$typ>("2 | 1"), 3);
+            assert_eq!(eval::<$typ>("3 ^ 1"), 2);
+            assert_eq!(eval::<$typ>("1 | 6 ^ 7 & 12"), 3);
+            assert_eq!(eval::<$typ>("(1 | 6) ^ 7 & 12"), 3);
+            assert_eq!(eval::<$typ>("1 | (6 ^ 7) & 12"), 1);
+
+            assert_eq!(eval::<$typ>("3 << 2"), 12);
+            assert_eq!(eval::<$typ>("12 >> 2"), 3);
+
+            assert_eq!(eval::<$typ>("0 - 1"), 0.wrapping_sub(&1));
+            assert_eq!(eval::<$typ>("-64 + 3"), 64.wrapping_neg().wrapping_add(&3));
+
+            assert_eq!(eval::<$typ>(&format!("{} + 1", <$typ>::MAX)), <$typ>::MAX.wrapping_add(1));
+        }
+    }
+
     #[test]
     fn simple() {
-        assert_eq!(eval::<u32>("1"), 1);
-        assert_eq!(eval::<u32>("(1)"), 1);
-        assert_eq!(eval::<u32>("(1 + 1)"), 2);
-        assert_eq!(eval::<u32>("(1) + 1"), 2);
-        assert_eq!(eval::<u32>("1 + (1)"), 2);
-        assert_eq!(eval::<u32>("10 + 2 * 5"), 20);
-        assert_eq!(eval::<u32>("(10 + 2) * 5"), 60);
+        simple_tests!(u8);
+        simple_tests!(u16);
+        simple_tests!(u32);
+        simple_tests!(u64);
 
-        assert_eq!(eval::<u32>("10/3"), 3);
-        assert_eq!(eval::<u32>("10 % 3"), 1);
-
-        assert_eq!(eval::<u32>("2 & 1"), 0);
-        assert_eq!(eval::<u32>("2 | 1"), 3);
-        assert_eq!(eval::<u32>("3 ^ 1"), 2);
-        assert_eq!(eval::<u32>("1 | 6 ^ 7 & 12"), 3);
-        assert_eq!(eval::<u32>("(1 | 6) ^ 7 & 12"), 3);
-        assert_eq!(eval::<u32>("1 | (6 ^ 7) & 12"), 1);
-
-        assert_eq!(eval::<u32>("3 << 2"), 12);
-        assert_eq!(eval::<u32>("12 >> 2"), 3);
-
-        assert_eq!(eval::<u8>("127 + 1"), 127.wrapping_add(&1));
-        assert_eq!(eval::<u8>("0 - 1"), 0.wrapping_sub(&1));
+        simple_tests!(i8);
+        simple_tests!(i16);
+        simple_tests!(i32);
+        simple_tests!(i64);
     }
 
     #[test]
