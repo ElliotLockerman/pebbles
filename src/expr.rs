@@ -133,6 +133,8 @@ mod tests {
             assert_eq!(eval::<$typ>("1 | 6 ^ 7 & 12"), 3);
             assert_eq!(eval::<$typ>("(1 | 6) ^ 7 & 12"), 3);
             assert_eq!(eval::<$typ>("1 | (6 ^ 7) & 12"), 1);
+            assert_eq!(eval::<$typ>("!34"), !34);
+            assert_eq!(eval::<$typ>("~34"), !34);
 
             assert_eq!(eval::<$typ>("3 << 2"), 12);
             assert_eq!(eval::<$typ>("12 >> 2"), 3);

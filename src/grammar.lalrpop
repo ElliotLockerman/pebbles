@@ -37,6 +37,7 @@ pub Expr: expr::Expr = {
     #[precedence(level="1")] #[assoc(side="left")]
     "-" <Expr> => Neg(Box::new(<>)),
     "!" <Expr> => Bitnot(Box::new(<>)),
+    "~" <Expr> => Bitnot(Box::new(<>)),
 
     // Precedence 2 reserved for 'as'
 
