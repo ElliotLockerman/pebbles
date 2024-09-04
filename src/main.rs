@@ -7,10 +7,10 @@ mod traits;
 
 use std::process::ExitCode;
 use std::thread_local;
-use std::{fmt, ops};
 
 use lalrpop_util::lalrpop_mod;
 lalrpop_mod!(grammar, "/grammar.rs");
+use traits::Int;
 
 use rustyline::{DefaultEditor, error::ReadlineError};
 use clap::{Parser, ValueEnum};
@@ -28,10 +28,13 @@ enum Base {
     Oct,
 }
 
-fn print_int<T>(mut val: T, base: Base) 
-    where T: PrimInt + fmt::Display + fmt::Octal + fmt::UpperHex + fmt::Binary + ops::ShrAssign {
+fn print_int<T: Int>(val: T, base: Base) {
     println!("{val}₁₀");
 
+    print_int_continue(val.as_unsigned(), base);
+}
+
+fn print_int_continue<T: Int>(mut val: T, base: Base) {
     // For oct and hex, split the binary in digit-sized chunks, and align them.
     let (digit_bits, subscript) = match base {
         Base::Oct => (T::from(3).unwrap(), &"₈"), 
@@ -103,6 +106,11 @@ enum IntType {
     U32,
     U64,
     U128,
+    I8,
+    I16,
+    I32,
+    I64,
+    I128,
 }
 
 #[derive(Parser, Debug)]
@@ -150,6 +158,11 @@ fn exec(expr: &str, base: Base, typ: IntType) -> Result<(), ()> {
         U32 => eval!(expr, base, u32),
         U64 => eval!(expr, base, u64),
         U128 => eval!(expr, base, u128),
+        I8 => eval!(expr, base, i8),
+        I16 => eval!(expr, base, i16),
+        I32 => eval!(expr, base, i32),
+        I64 => eval!(expr, base, i64),
+        I128 => eval!(expr, base, i128),
     }
 
     Ok(())

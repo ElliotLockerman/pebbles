@@ -1,10 +1,7 @@
 
-use thiserror::Error;
-use num_traits::ops::wrapping::*;
-use num_traits::int::PrimInt;
-use num_traits::cast::FromPrimitive;
+use crate::traits::Int;
 
-use crate::traits::{WrappingDiv, WrappingRem};
+use thiserror::Error;
 
 #[derive(Debug, Error, PartialEq, Eq)]
 pub enum Error {
@@ -12,7 +9,6 @@ pub enum Error {
     LitParse(String),
 }
 
-pub trait Int = PrimInt + WrappingAdd + WrappingSub + WrappingMul + WrappingNeg + WrappingShl + WrappingShr + WrappingDiv + WrappingRem + FromPrimitive;
 
 
 #[derive(Debug, Clone, Copy, Error)]
