@@ -81,5 +81,31 @@ convert_impl!(AsUnsigned, i32, u32);
 convert_impl!(AsUnsigned, i64, u64);
 convert_impl!(AsUnsigned, i128, u128);
 
-pub trait Int = PrimInt + WrappingAdd + WrappingSub + WrappingMul + WrappingNeg + WrappingShl + WrappingShr + WrappingDiv + WrappingRem + FromPrimitive + fmt::Display + fmt::Octal + fmt::UpperHex + fmt::Binary + ops::ShrAssign + AsUnsigned;
+
+pub trait IsSigned {
+    fn is_signed() -> bool;
+}
+
+macro_rules! is_signed_impl {
+    ($trait_name:ident, $typ:ty, $val:expr) => {
+        impl IsSigned for $typ {
+            fn is_signed() -> bool {
+                $val
+            }
+        }
+    }
+}
+
+is_signed_impl!(IsSigned, u8, false);
+is_signed_impl!(IsSigned, u16, false);
+is_signed_impl!(IsSigned, u32, false);
+is_signed_impl!(IsSigned, u64, false);
+is_signed_impl!(IsSigned, u128, false);
+is_signed_impl!(IsSigned, i8, true);
+is_signed_impl!(IsSigned, i16, true);
+is_signed_impl!(IsSigned, i32, true);
+is_signed_impl!(IsSigned, i64, true);
+is_signed_impl!(IsSigned, i128, true);
+
+pub trait Int = PrimInt + WrappingAdd + WrappingSub + WrappingMul + WrappingNeg + WrappingShl + WrappingShr + WrappingDiv + WrappingRem + FromPrimitive + fmt::Display + fmt::Octal + fmt::UpperHex + fmt::Binary + ops::ShrAssign + AsUnsigned + IsSigned;
 

@@ -105,12 +105,10 @@ enum IntType {
     U16,
     U32,
     U64,
-    U128,
     I8,
     I16,
     I32,
     I64,
-    I128,
 }
 
 #[derive(Parser, Debug)]
@@ -157,12 +155,10 @@ fn exec(expr: &str, base: Base, typ: IntType) -> Result<(), ()> {
         U16 => eval!(expr, base, u16),
         U32 => eval!(expr, base, u32),
         U64 => eval!(expr, base, u64),
-        U128 => eval!(expr, base, u128),
         I8 => eval!(expr, base, i8),
         I16 => eval!(expr, base, i16),
         I32 => eval!(expr, base, i32),
         I64 => eval!(expr, base, i64),
-        I128 => eval!(expr, base, i128),
     }
 
     Ok(())
