@@ -89,33 +89,44 @@ mod tests {
     use crate::grammar::ExprParser;
 
     use std::assert_matches::assert_matches;
+    use std::thread_local;
 
     use lalrpop_util::ParseError;
 
+    fn eval<T: Int>(s: &str) -> T {
+        thread_local! {
+            static PARSER: ExprParser = Default::default();
+        }
+        PARSER.with(|p|
+            p.parse(s).unwrap().eval::<T>().unwrap()
+        )
+    }
+
     #[test]
     fn simple() {
-        let parser = ExprParser::new();
+        assert_eq!(eval::<u32>("1"), 1);
+        assert_eq!(eval::<u32>("(1)"), 1);
+        assert_eq!(eval::<u32>("(1 + 1)"), 2);
+        assert_eq!(eval::<u32>("(1) + 1"), 2);
+        assert_eq!(eval::<u32>("1 + (1)"), 2);
+        assert_eq!(eval::<u32>("10 + 2 * 5"), 20);
+        assert_eq!(eval::<u32>("(10 + 2) * 5"), 60);
 
-        assert_eq!(parser.parse("1").unwrap().eval(), 1);
-        assert_eq!(parser.parse("(1)").unwrap().eval(), 1);
-        assert_eq!(parser.parse("(1 + 1)").unwrap().eval(), 2);
-        assert_eq!(parser.parse("(1) + 1").unwrap().eval(), 2);
-        assert_eq!(parser.parse("1 + (1)").unwrap().eval(), 2);
-        assert_eq!(parser.parse("10 + 2 * 5").unwrap().eval(), 20);
-        assert_eq!(parser.parse("(10 + 2) * 5").unwrap().eval(), 60);
+        assert_eq!(eval::<u32>("10/3"), 3);
+        assert_eq!(eval::<u32>("10 % 3"), 1);
 
-        assert_eq!(parser.parse("10/3").unwrap().eval(), 3);
-        assert_eq!(parser.parse("10 % 3").unwrap().eval(), 1);
+        assert_eq!(eval::<u32>("2 & 1"), 0);
+        assert_eq!(eval::<u32>("2 | 1"), 3);
+        assert_eq!(eval::<u32>("3 ^ 1"), 2);
+        assert_eq!(eval::<u32>("1 | 6 ^ 7 & 12"), 3);
+        assert_eq!(eval::<u32>("(1 | 6) ^ 7 & 12"), 3);
+        assert_eq!(eval::<u32>("1 | (6 ^ 7) & 12"), 1);
 
-        assert_eq!(parser.parse("2 & 1").unwrap().eval(), 0);
-        assert_eq!(parser.parse("2 | 1").unwrap().eval(), 3);
-        assert_eq!(parser.parse("3 ^ 1").unwrap().eval(), 2);
-        assert_eq!(parser.parse("1 | 6 ^ 7 & 12").unwrap().eval(), 3);
-        assert_eq!(parser.parse("(1 | 6) ^ 7 & 12").unwrap().eval(), 3);
-        assert_eq!(parser.parse("1 | (6 ^ 7) & 12").unwrap().eval(), 1);
+        assert_eq!(eval::<u32>("3 << 2"), 12);
+        assert_eq!(eval::<u32>("12 >> 2"), 3);
 
-        assert_eq!(parser.parse("3 << 2").unwrap().eval(), 12);
-        assert_eq!(parser.parse("12 >> 2").unwrap().eval(), 3);
+        assert_eq!(eval::<u8>("127 + 1"), 127.wrapping_add(&1));
+        assert_eq!(eval::<u8>("0 - 1"), 0.wrapping_sub(&1));
     }
 
     #[test]
@@ -123,24 +134,24 @@ mod tests {
         let parser = ExprParser::new();
 
         assert_matches!(
-            parser.parse("1000000000000").unwrap_err(),
-            ParseError::User{error: Error::LitParse(_)},
+            parser.parse("1000000000000").unwrap().eval::<u32>(),
+            Err(EvalErr::TooLarge(_))
         );
         assert_matches!(
             parser.parse("0xg").unwrap_err(),
             ParseError::InvalidToken{..},
         );
         assert_matches!(
-            parser.parse("0x1000000000000").unwrap_err(),
-            ParseError::User{error: Error::LitParse(_)},
+            parser.parse("0x1000000000000").unwrap().eval::<u32>(),
+            Err(EvalErr::TooLarge(_))
         );
         assert_matches!(
             parser.parse("0o9").unwrap_err(),
             ParseError::InvalidToken{..},
         );
         assert_matches!(
-            parser.parse("0o1000000000000").unwrap_err(),
-            ParseError::User{error: Error::LitParse(_)},
+            parser.parse("0o1000000000000").unwrap().eval::<u32>(),
+            Err(EvalErr::TooLarge(_))
         );
         parser.parse("10 + 1)").unwrap_err();
         parser.parse("10 ++ 1)").unwrap_err();
@@ -148,31 +159,44 @@ mod tests {
         parser.parse("(10 + 1").unwrap_err();
         parser.parse("10)( + 1").unwrap_err();
         parser.parse("10() + 1").unwrap_err();
+
+        assert_matches!(
+            parser.parse("-256 - 1").unwrap().eval::<i8>(),
+            Err(EvalErr::TooLarge(_))
+        );
     }
 
     #[test]
     fn unary() {
-        let parser = ExprParser::new();
+        assert_eq!(eval::<u32>("-1"), -1i32 as u32);
+        assert_eq!(eval::<u32>("-0"), -0i32 as u32);
+        assert_eq!(eval::<u32>("-5 - 6"), (-5i32 as u32).wrapping_sub(6));
+        assert_eq!(eval::<u32>("-5 + 6"), (-5i32 as u32).wrapping_add(6));
+        assert_eq!(eval::<u32>("-5 + -6"), (-5i32 as u32).wrapping_add(-6i32 as u32));
 
-        assert_eq!(parser.parse("-1").unwrap().eval(), -1i32 as u32);
-        assert_eq!(parser.parse("-0").unwrap().eval(), -0i32 as u32);
-        assert_eq!(parser.parse("-5 - 6").unwrap().eval(), (-5i32 as u32).wrapping_sub(6));
-        assert_eq!(parser.parse("-5 + 6").unwrap().eval(), (-5i32 as u32).wrapping_add(6));
-        assert_eq!(parser.parse("-5 + -6").unwrap().eval(), (-5i32 as u32).wrapping_add(-6i32 as u32));
-
-        assert_eq!(parser.parse("!0").unwrap().eval(), !0);
-        assert_eq!(parser.parse("!1").unwrap().eval(), !1);
-        assert_eq!(parser.parse("!32").unwrap().eval(), !32);
-        assert_eq!(parser.parse("!(-32)").unwrap().eval(), !(-32i32 as u32));
+        assert_eq!(eval::<u32>("!0"), !0);
+        assert_eq!(eval::<u32>("!1"), !1);
+        assert_eq!(eval::<u32>("!32"), !32);
+        assert_eq!(eval::<u32>("!(-32)"), !(-32i32 as u32));
     }
 
     #[test]
     fn radix_literal() {
-        let parser = ExprParser::new();
+        assert_eq!(eval::<u32>("0xf"), 15);
+        assert_eq!(eval::<u32>("0o20"), 16);
+        assert_eq!(eval::<u32>("0xf ^ 0o20"), 31);
+    }
 
-        assert_eq!(parser.parse("0xf").unwrap().eval(), 15);
-        assert_eq!(parser.parse("0o20").unwrap().eval(), 16);
-        assert_eq!(parser.parse("0xf ^ 0o20").unwrap().eval(), 31);
+    #[test]
+    fn signed() {
+        assert_eq!(eval::<i32>("0"), 0);
+        assert_eq!(eval::<i32>("1"), 1);
+        assert_eq!(eval::<i32>("-1"), -1);
+        assert_eq!(eval::<i32>("8 - 15"), -7);
+        assert_eq!(eval::<i32>("-3 * - 15"), 45);
+        assert_eq!(eval::<i32>("-3 * 15"), -45);
+
+        assert_eq!(eval::<i8>("127 + 1"), 127.wrapping_add(&1));
     }
 }
 
