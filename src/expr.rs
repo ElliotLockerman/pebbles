@@ -215,18 +215,30 @@ mod tests {
         assert_eq!(eval::<u32>("0xf ^ 0o20"), 31);
     }
 
+    macro_rules! signed_tests {
+        ($typ:ty) => {
+            assert_eq!(eval::<$typ>("0"), 0);
+            assert_eq!(eval::<$typ>("1"), 1);
+            assert_eq!(eval::<$typ>("-1"), -1);
+            assert_eq!(eval::<$typ>("8 - 15"), -7);
+            assert_eq!(eval::<$typ>("-3 * - 15"), 45);
+            assert_eq!(eval::<$typ>("-3 * 15"), -45);
+
+            assert_eq!(eval::<$typ>(&format!("{} - 1", <$typ>::MIN)), <$typ>::MIN.wrapping_sub(1));
+            assert_eq!(eval::<$typ>(&format!("{} + 1", <$typ>::MAX)), <$typ>::MAX.wrapping_add(1));
+            assert_eq!(eval::<$typ>(&format!("-1 * {}", <$typ>::MIN)), <$typ>::MIN.wrapping_mul(-1));
+            assert_eq!(eval::<$typ>("23 >> 3"), 23.wrapping_shr(3));
+            assert_eq!(eval::<$typ>(&format!("{} >> 1", <$typ>::MIN)), <$typ>::MIN.wrapping_shr(1));
+            assert_eq!(eval::<$typ>(&"-1 >> 1"), -1);
+        }
+    }
+
     #[test]
     fn signed() {
-        assert_eq!(eval::<i32>("0"), 0);
-        assert_eq!(eval::<i32>("1"), 1);
-        assert_eq!(eval::<i32>("-1"), -1);
-        assert_eq!(eval::<i32>("8 - 15"), -7);
-        assert_eq!(eval::<i32>("-3 * - 15"), 45);
-        assert_eq!(eval::<i32>("-3 * 15"), -45);
-
-        assert_eq!(eval::<i8>("-128 - 1"), i8::MIN.wrapping_sub(1));
-        assert_eq!(eval::<i8>("127 + 1"), 127.wrapping_add(&1));
-        assert_eq!(eval::<i8>("-1 * -128"), (-128).wrapping_mul(&-1));
+        signed_tests!(i8);
+        signed_tests!(i16);
+        signed_tests!(i32);
+        signed_tests!(i64);
     }
 }
 
