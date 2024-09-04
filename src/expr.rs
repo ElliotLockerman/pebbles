@@ -217,6 +217,23 @@ mod tests {
         assert_eq!(eval::<u32>("0xf ^ 0o20"), 31);
     }
 
+
+    macro_rules! unsigned_tests {
+        ($typ:ty) => {
+            assert_eq!(eval::<$typ>(&format!("{} >> 1", (1 as $typ) << (<$typ>::BITS - 1))), (1 << (<$typ>::BITS - 1)) >> 1);
+            assert_eq!(eval::<$typ>(&format!("{} >> 1", <$typ>::MAX)), <$typ>::MAX.wrapping_shr(1));
+            assert_eq!(eval::<$typ>("237 + !237 + 1"), 0);
+        }
+    }
+
+    #[test]
+    fn unsigned() {
+        unsigned_tests!(u8);
+        unsigned_tests!(u16);
+        unsigned_tests!(u32);
+        unsigned_tests!(u64);
+    }
+
     macro_rules! signed_tests {
         ($typ:ty) => {
             assert_eq!(eval::<$typ>("0"), 0);
@@ -232,6 +249,7 @@ mod tests {
             assert_eq!(eval::<$typ>("23 >> 3"), 23.wrapping_shr(3));
             assert_eq!(eval::<$typ>(&format!("{} >> 1", <$typ>::MIN)), <$typ>::MIN.wrapping_shr(1));
             assert_eq!(eval::<$typ>(&"-1 >> 1"), -1);
+            assert_eq!(eval::<$typ>(&format!("{} >> 1", <$typ>::MAX)), <$typ>::MAX.wrapping_shr(1));
         }
     }
 
