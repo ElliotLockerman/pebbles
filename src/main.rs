@@ -7,6 +7,7 @@ mod traits;
 
 use std::process::ExitCode;
 use std::thread_local;
+use std::io::{self, Write};
 
 use lalrpop_util::lalrpop_mod;
 lalrpop_mod!(grammar, "/grammar.rs");
@@ -28,13 +29,19 @@ enum Base {
     Oct,
 }
 
-fn print_int<T: Int>(val: T, base: Base) {
-    println!("{val}₁₀");
+fn write_int<T: Int>(f: &mut impl Write, val: T, base: Base) -> io::Result<()> {
+    writeln!(f, "{val}₁₀")?;
 
-    print_int_continue(val.as_unsigned(), base);
+    // Writing the decimal representation, above, is signedness-aware. The rest
+    // of the writing is purely the underlying representation, and doesn't vary
+    // between signed and unsigned. On the other hand, the rest of it needs a
+    // logical right shift, so a convertion to unsigned is done. Since the type
+    // changes (given Rust's restrictions) its easiest to do the rest in a separate
+    // function.
+    write_int_continue(f, val.as_unsigned(), base)
 }
 
-fn print_int_continue<T: Int>(mut val: T, base: Base) {
+fn write_int_continue<T: Int>(f: & mut impl Write, mut val: T, base: Base) -> io::Result<()> {
     // For oct and hex, split the binary in digit-sized chunks, and align them.
     let (digit_bits, subscript) = match base {
         Base::Oct => (T::from(3).unwrap(), &"₈"), 
@@ -61,40 +68,44 @@ fn print_int_continue<T: Int>(mut val: T, base: Base) {
         t_bits % digit_bits
     };
 
-    // Print hex/oct, aligned with binary.
+    // Write hex/oct, aligned with binary.
     let mut seen_nonzero = false;
     for (i, digit) in digits.iter().rev().enumerate() {
         if i != 0 {
-            print!(" ");
+            write!(f, " ")?;
         }
 
         let chunk_width = if i == 0 { top_bits } else { digit_bits }.to_usize().unwrap();
 
-        // Don't print oct/hex leading zeros.
+        // Don't write leading zeros for oct/hex.
         if *digit != T::zero() {
             seen_nonzero = true;
         }
         if !seen_nonzero && i + 1 != digits.len() {
-            print!("{:chunk_width$}", "");
+            write!(f, "{:chunk_width$}", "")?;
         } else {
             match base {
-                Base::Oct => print!("{digit:chunk_width$o}"),
-                Base::Hex => print!("{digit:chunk_width$X}"),
+                Base::Oct => write!(f, "{digit:chunk_width$o}")?,
+                Base::Hex => write!(f, "{digit:chunk_width$X}")?,
             }
         }
     }
-    println!("{subscript}");
+    writeln!(f, "{subscript}")?;
 
-    // Print binary (including leading zeros).
+    // Write binary (including leading zeros).
     for (i, digit) in digits.iter().rev().enumerate() {
         if i != 0 {
-            print!(" ");
+            write!(f, " ")?;
         }
         let chunk_width = if i == 0 { top_bits } else { digit_bits }.to_usize().unwrap();
-        print!("{digit:0chunk_width$b}");
+        write!(f, "{digit:0chunk_width$b}")?;
     }
-    println!("₂");
+    writeln!(f, "₂")
+}
 
+fn print_int<T: Int>(val: T, base: Base) {
+    let mut stdout = io::stdout().lock();
+    write_int(&mut stdout, val, base).expect("Error printing int");
 }
 
 
