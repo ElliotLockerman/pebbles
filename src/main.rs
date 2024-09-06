@@ -29,6 +29,23 @@ enum Base {
     Oct,
 }
 
+impl Base {
+    fn bits(self) -> u32 {
+        match self {
+            Self::Hex => 4,
+            Self::Oct => 3,
+        }
+    }
+
+
+    fn subscript(self) -> &'static str {
+         match self {
+            Base::Oct => "₈", 
+            Base::Hex => "₁₆",
+        }
+    }
+}
+
 fn write_int<T: Int>(f: &mut impl Write, val: T, base: Base) -> io::Result<()> {
     writeln!(f, "{val}₁₀")?;
 
@@ -43,10 +60,9 @@ fn write_int<T: Int>(f: &mut impl Write, val: T, base: Base) -> io::Result<()> {
 
 fn write_int_continue<T: Int>(f: & mut impl Write, mut val: T, base: Base) -> io::Result<()> {
     // For oct and hex, split the binary in digit-sized chunks, and align them.
-    let (digit_bits, subscript) = match base {
-        Base::Oct => (T::from(3).unwrap(), &"₈"), 
-        Base::Hex => (T::from(4).unwrap(), &"₁₆"),
-    };
+
+    let subscript = base.subscript();
+    let digit_bits = T::from_u32(base.bits()).unwrap();
     let digit_mask = (T::one() << digit_bits.to_usize().unwrap()) - T::one();
     let mut digits = vec![];
     while val > T::zero() {
@@ -206,3 +222,148 @@ fn main() -> ExitCode {
     ExitCode::SUCCESS
 }
 
+#[cfg(test)]
+mod tests {
+    use std::fmt::Debug;
+    use std::str::FromStr;
+    use std::sync::LazyLock;
+    use std::io::BufWriter;
+
+    use lalrpop_util::lalrpop_mod;
+    lalrpop_mod!(grammar, "/grammar.rs");
+    use super::{Base, write_int};
+    use crate::traits::Int;
+
+    use regex::Regex;
+
+    fn check_dec<T: Int + FromStr>(s: &str, expected: T) 
+        where <T as FromStr>::Err: Debug {
+
+        static RE: LazyLock<Regex> = LazyLock::new(|| 
+            Regex::new(r#"(-?\d+)₁₀"#).unwrap()
+        );
+        let caps = RE.captures(s).unwrap();
+        let val = caps.get(1).unwrap().as_str().parse::<T>().unwrap();
+        assert_eq!(val, expected); 
+    }
+
+    fn check_hex<T: Int>(s: &str, expected: T) 
+        where <T as num_traits::Num>::FromStrRadixErr: Debug {
+
+        static OVERALL_RE: LazyLock<Regex> = LazyLock::new(|| 
+            Regex::new(r#"^(?:\s+[[:xdigit:]])+₁₆$"#).unwrap()
+        );
+
+        static DIGIT_RE: LazyLock<Regex> = LazyLock::new(||
+            Regex::new(r#"\s+([[:xdigit:]])"#).unwrap()
+        );
+
+
+        assert!(OVERALL_RE.is_match(s));
+        let digit_bits = T::from_u32(Base::Hex.bits()).unwrap();
+        let mut val = T::zero();
+        for x in DIGIT_RE.captures_iter(s) {
+            val <<= digit_bits;
+            val += T::from_str_radix(x.get(1).unwrap().as_str(), 16).unwrap();
+        }
+        assert_eq!(val, expected); 
+    }
+
+    fn check_oct<T: Int>(s: &str, expected: T) 
+        where <T as num_traits::Num>::FromStrRadixErr: Debug {
+
+        static OVERALL_RE: LazyLock<Regex> = LazyLock::new(|| 
+            Regex::new(r#"^(?:\s+[0-7])+₈$"#).unwrap()
+        );
+
+        static DIGIT_RE: LazyLock<Regex> = LazyLock::new(||
+            Regex::new(r#"\s+([0-7])"#).unwrap()
+        );
+
+
+        assert!(OVERALL_RE.is_match(s));
+
+        // The first digit has fewer, but the first shift doesn't do anything
+        // (the accumulator is all zeros), and after that the shift is by regular
+        // 3-bit digits.
+        let digit_bits = T::from_u32(Base::Oct.bits()).unwrap();
+
+        let mut val = T::zero();
+        for x in DIGIT_RE.captures_iter(s) {
+            val <<= digit_bits;
+            val += T::from_str_radix(x.get(1).unwrap().as_str(), 8).unwrap();
+        }
+        assert_eq!(val, expected); 
+    }
+
+
+    fn check_bin<T: Int>(s: &str, base: Base, expected: T)
+        where <T as num_traits::Num>::FromStrRadixErr: Debug {
+
+        static OVERALL_RE: LazyLock<Regex> = LazyLock::new(|| 
+            Regex::new(r#"^(?: ?[01]{1,4})+₂$"#).unwrap()
+        );
+
+        static DIGIT_RE: LazyLock<Regex> = LazyLock::new(||
+            Regex::new(r#" ?([01]{1,4})"#).unwrap()
+        );
+
+        assert!(OVERALL_RE.is_match(s));
+        // See comment on digit_bits in check_oct()
+        let group_bits = T::from_u32(base.bits()).unwrap();
+        let mut val = T::zero();
+        for x in DIGIT_RE.captures_iter(s) {
+            val <<= group_bits;
+            val += T::from_str_radix(x.get(1).unwrap().as_str(), 2).unwrap();
+        }
+        assert_eq!(val, expected); 
+    }
+
+    fn check_output<T: Int + FromStr>(s: &str, base: Base, expected: T)
+        where <T as num_traits::Num>::FromStrRadixErr: Debug,
+              <T as FromStr>::Err: Debug {
+
+        let mut lines = s.lines();
+        let dec = lines.next().expect("Missing dec line");
+        check_dec::<T>(dec, expected);
+
+        let hex_or_oct = lines.next().expect("Missing hex or oct line");
+        match base {
+            Base::Oct => check_oct::<T>(hex_or_oct, expected),
+            Base::Hex => check_hex::<T>(hex_or_oct, expected),
+        }
+
+        let bin = lines.next().expect("Missing bin line");
+        check_bin::<T>(bin, base, expected);
+
+        assert_eq!(lines.next(), None);
+    }
+
+    fn run<T: Int + FromStr>(expr: &str, base: Base, expected: T)
+        where <T as num_traits::Num>::FromStrRadixErr: Debug,
+              <T as FromStr>::Err: Debug {
+
+        static PARSER: LazyLock<grammar::ExprParser> = LazyLock::new(||
+            Default::default()
+        );
+        
+        let expr = PARSER.parse(expr).unwrap();
+        let val = expr.eval::<T>().unwrap();
+
+        let mut output = BufWriter::new(vec![]);
+        write_int(&mut output, val, base).unwrap();
+
+        let s = String::from_utf8(output.into_inner().unwrap()).unwrap();
+        check_output(&s, base, expected);
+    }
+
+    #[test]
+    fn tests() {
+        run::<u32>("307200", Base::Hex, 307200);
+        run::<i32>("-307200", Base::Hex, -307200);
+        run::<u32>("307200", Base::Oct, 307200);
+
+        run::<u32>("3 * 3", Base::Oct, 3 * 3);
+    }
+
+}

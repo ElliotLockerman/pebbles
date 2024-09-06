@@ -6,6 +6,9 @@ edition = "2021"
 [build-dependencies]
 lalrpop = "0.20.2"
 
+[dev-dependencies]
+regex = "1.10.6"
+
 [dependencies]
 clap = { version = "4.5.8", features = ["derive"] }
 lalrpop-util = { version = "0.20.2", features = ["lexer", "unicode"] }
@@ -13,3 +16,4 @@ num-traits = "0.2.19"
 rustyline = "14.0.0"
 strum = { version = "0.26.3", features = ["derive", "strum_macros"] }
 thiserror = "1.0.63"
+

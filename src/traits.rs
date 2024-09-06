@@ -1,6 +1,6 @@
 
-use core::ops::{Div, Rem};
-use std::{fmt, ops};
+use core::ops::{self, Div, Rem};
+use std::fmt;
 
 use num_traits::ops::wrapping::*;
 use num_traits::cast::FromPrimitive;
@@ -107,5 +107,5 @@ is_signed_impl!(IsSigned, i32, true);
 is_signed_impl!(IsSigned, i64, true);
 is_signed_impl!(IsSigned, i128, true);
 
-pub trait Int = PrimInt + WrappingAdd + WrappingSub + WrappingMul + WrappingNeg + WrappingShl + WrappingShr + WrappingDiv + WrappingRem + FromPrimitive + fmt::Display + fmt::Octal + fmt::UpperHex + fmt::Binary + ops::ShrAssign + AsUnsigned + IsSigned;
+pub trait Int = PrimInt + WrappingAdd + WrappingSub + WrappingMul + WrappingNeg + WrappingShl + WrappingShr + WrappingDiv + WrappingRem + ops::AddAssign + FromPrimitive + fmt::Display + fmt::Debug + fmt::Octal + fmt::UpperHex + fmt::Binary + ops::ShrAssign + ops::ShlAssign + AsUnsigned + IsSigned;
 

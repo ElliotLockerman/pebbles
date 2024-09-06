@@ -83,6 +83,7 @@ dependencies = [
  "lalrpop",
  "lalrpop-util",
  "num-traits",
+ "regex",
  "rustyline",
  "strum",
  "thiserror",
