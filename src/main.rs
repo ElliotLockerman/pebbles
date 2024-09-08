@@ -239,10 +239,10 @@ mod tests {
     fn check_dec<T: Int + FromStr>(s: &str, expected: T) 
         where <T as FromStr>::Err: Debug {
 
-        static RE: LazyLock<Regex> = LazyLock::new(|| 
-            Regex::new(r#"(-?\d+)₁₀"#).unwrap()
-        );
-        let caps = RE.captures(s).unwrap();
+        thread_local! {
+            static RE: Regex = Regex::new(r#"(-?\d+)₁₀"#).unwrap();
+        }
+        let caps = RE.with(|re| re.captures(s).unwrap());
         let val = caps.get(1).unwrap().as_str().parse::<T>().unwrap();
         assert_eq!(val, expected); 
     }
@@ -250,38 +250,32 @@ mod tests {
     fn check_hex<T: Int>(s: &str, expected: T) 
         where <T as num_traits::Num>::FromStrRadixErr: Debug {
 
-        static OVERALL_RE: LazyLock<Regex> = LazyLock::new(|| 
-            Regex::new(r#"^(?:\s+[[:xdigit:]])+₁₆$"#).unwrap()
-        );
+        thread_local! {
+            static OVERALL_RE: Regex = Regex::new(r#"^(?:\s+[[:xdigit:]])+₁₆$"#).unwrap();
+            static DIGIT_RE: Regex = Regex::new(r#"\s+([[:xdigit:]])"#).unwrap();
+        }
 
-        static DIGIT_RE: LazyLock<Regex> = LazyLock::new(||
-            Regex::new(r#"\s+([[:xdigit:]])"#).unwrap()
-        );
-
-
-        assert!(OVERALL_RE.is_match(s));
+        assert!(OVERALL_RE.with(|re| re.is_match(s)));
         let digit_bits = T::from_u32(Base::Hex.bits()).unwrap();
         let mut val = T::zero();
-        for x in DIGIT_RE.captures_iter(s) {
-            val <<= digit_bits;
-            val += T::from_str_radix(x.get(1).unwrap().as_str(), 16).unwrap();
-        }
+        DIGIT_RE.with(|re| {
+            for x in re.captures_iter(s) {
+                val <<= digit_bits;
+                val += T::from_str_radix(x.get(1).unwrap().as_str(), 16).unwrap();
+            }
+        });
         assert_eq!(val, expected); 
     }
 
     fn check_oct<T: Int>(s: &str, expected: T) 
         where <T as num_traits::Num>::FromStrRadixErr: Debug {
 
-        static OVERALL_RE: LazyLock<Regex> = LazyLock::new(|| 
-            Regex::new(r#"^(?:\s+[0-7])+₈$"#).unwrap()
-        );
+        thread_local! {
+            static OVERALL_RE: Regex = Regex::new(r#"^(?:\s*[0-7])+₈$"#).unwrap();
+            static DIGIT_RE: Regex = Regex::new(r#"\s*([0-7])"#).unwrap();
+        }
 
-        static DIGIT_RE: LazyLock<Regex> = LazyLock::new(||
-            Regex::new(r#"\s+([0-7])"#).unwrap()
-        );
-
-
-        assert!(OVERALL_RE.is_match(s));
+        assert!(OVERALL_RE.with(|re| re.is_match(s)));
 
         // The first digit has fewer, but the first shift doesn't do anything
         // (the accumulator is all zeros), and after that the shift is by regular
@@ -289,10 +283,12 @@ mod tests {
         let digit_bits = T::from_u32(Base::Oct.bits()).unwrap();
 
         let mut val = T::zero();
-        for x in DIGIT_RE.captures_iter(s) {
-            val <<= digit_bits;
-            val += T::from_str_radix(x.get(1).unwrap().as_str(), 8).unwrap();
-        }
+        DIGIT_RE.with(|re| {
+            for x in re.captures_iter(s) {
+                val <<= digit_bits;
+                val += T::from_str_radix(x.get(1).unwrap().as_str(), 8).unwrap();
+            }
+        });
         assert_eq!(val, expected); 
     }
 
@@ -300,22 +296,21 @@ mod tests {
     fn check_bin<T: Int>(s: &str, base: Base, expected: T)
         where <T as num_traits::Num>::FromStrRadixErr: Debug {
 
-        static OVERALL_RE: LazyLock<Regex> = LazyLock::new(|| 
-            Regex::new(r#"^(?: ?[01]{1,4})+₂$"#).unwrap()
-        );
+        thread_local! {
+            static OVERALL_RE: Regex = Regex::new(r#"^(?: ?[01]{1,4})+₂$"#).unwrap();
+            static DIGIT_RE: Regex = Regex::new(r#" ?([01]{1,4})"#).unwrap();
+        }
 
-        static DIGIT_RE: LazyLock<Regex> = LazyLock::new(||
-            Regex::new(r#" ?([01]{1,4})"#).unwrap()
-        );
-
-        assert!(OVERALL_RE.is_match(s));
+        assert!(OVERALL_RE.with(|re| re.is_match(s)));
         // See comment on digit_bits in check_oct()
         let group_bits = T::from_u32(base.bits()).unwrap();
         let mut val = T::zero();
-        for x in DIGIT_RE.captures_iter(s) {
-            val <<= group_bits;
-            val += T::from_str_radix(x.get(1).unwrap().as_str(), 2).unwrap();
-        }
+        DIGIT_RE.with(|re| {
+            for x in re.captures_iter(s) {
+                val <<= group_bits;
+                val += T::from_str_radix(x.get(1).unwrap().as_str(), 2).unwrap();
+            }
+        });
         assert_eq!(val, expected); 
     }
 
@@ -349,6 +344,7 @@ mod tests {
         
         let expr = PARSER.parse(expr).unwrap();
         let val = expr.eval::<T>().unwrap();
+        assert_eq!(val, expected);
 
         let mut output = BufWriter::new(vec![]);
         write_int(&mut output, val, base).unwrap();
@@ -364,6 +360,55 @@ mod tests {
         run::<u32>("307200", Base::Oct, 307200);
 
         run::<u32>("3 * 3", Base::Oct, 3 * 3);
+    }
+
+    fn simple_tests<T: Int + FromStr>(base: Base)
+        where <T as num_traits::Num>::FromStrRadixErr: Debug,
+              <T as FromStr>::Err: Debug {
+
+        run("1", base, 1);
+        run("(1)", base, 1);
+        run("(1 + 1)", base, 2);
+        run("(1) + 1", base, 2);
+        run("1 + (1)", base, 2);
+        run("10 + 2 * 5", base, 20);
+        run("(10 + 2) * 5", base, 60);
+
+        run("10/3", base, 3);
+        run("10 % 3", base, 1);
+
+        run("2 & 1", base, 0);
+        run("2 | 1", base, 3);
+        run("3 ^ 1", base, 2);
+        run("1 | 6 ^ 7 & 12", base, 3);
+        run("(1 | 6) ^ 7 & 12", base, 3);
+        run("1 | (6 ^ 7) & 12", base, 1);
+        run("!34", base, !34);
+        run("~34", base, !34);
+
+        run("3 << 2", base, 12);
+        run("12 >> 2", base, 3);
+
+        run("0 - 1", base, T::zero().wrapping_sub(&T::one()));
+        run("-64 + 3", base, T::from_u32(64).unwrap().wrapping_neg().wrapping_add(&T::from_u32(3).unwrap()));
+
+        run(&format!("{} + 1", T::max_value()), base, T::max_value().wrapping_add(&T::one()));
+    }
+
+    #[test]
+    fn simple() {
+        for base in [Base::Hex, Base::Oct] {
+            simple_tests::<u8>(base);
+            simple_tests::<u16>(base);
+            simple_tests::<u32>(base);
+            simple_tests::<u64>(base);
+
+            simple_tests::<i8>(base);
+            simple_tests::<i16>(base);
+            simple_tests::<i32>(base);
+            simple_tests::<i64>(base);
+
+        }
     }
 
 }
