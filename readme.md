@@ -42,7 +42,7 @@ $ pebbles --type=i32
 # Usage
 
 - Options
-    - `--base <base>`: base for output. One of {`hext`, `oct`}, default `oct`. Decimal and binary output are always printed. For signed types, decimal output is printed with a negative sign when appropriate; hex, oct, and binary output always reflects the bit pattern directly.
+    - `--base <base>`: base for output. One of {`hext`, `oct`}, default `hex`. Decimal and binary output are always printed. For signed types, decimal output is printed with a negative sign when appropriate; hex, oct, and binary output always reflects the bit pattern directly.
     - `--type <TYPE>`: one of {`u8`, `u16`, `u32`, `u64`, `i8`, `i16`, `i32`, `i64`}, default `u32`. All values in the expression are of the selected type.
 - Positional Arguments:
     - `[EXER]`: an expression to evaluate. If not provided, the repl is entered.
