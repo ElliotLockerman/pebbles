@@ -138,13 +138,17 @@ enum IntType {
     I64,
 }
 
+/// Programmer's calculator
 #[derive(Parser, Debug)]
 struct Args {
+    /// Expression to evaluate. Leave empty for repl
     expr: Option<String>,
 
+    /// Base in which to print results. Decimal and binary are always printed
     #[arg(long, default_value_t=Base::Hex)]
     base: Base,
 
+    /// Type of expression
     #[arg(long = "type", default_value_t=IntType::U32)]
     typ: IntType,
 }
